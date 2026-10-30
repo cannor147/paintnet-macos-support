@@ -1,0 +1,17 @@
+#!/bin/bash
+set -euo pipefail
+BASE="$(cd "$(dirname "$0")/.." && pwd)"
+IFS= read -r WINE < "$BASE/wine-path"
+export WINEPREFIX="$BASE/wineprefix"
+export WINEDLLOVERRIDES='dxgi,d3d11,d3d10core=n;mshtml=;d3dcompiler_47=n'
+export VK_DRIVER_FILES="$BASE/runtime/icd/lavapipe.json:$BASE/runtime/icd/moltenvk.json"
+export DXVK_CONFIG_FILE="Z:$(printf '%s' "$BASE/app/dxvk.conf" | tr '/' '\\')"
+export LP_NUM_THREADS="${PDN_LLVMPIPE_THREADS:-4}"
+export MESA_SHADER_CACHE_DIR="$BASE/cache"
+export WINEDEBUG="${PDN_WINEDEBUG:--all}"
+export DXVK_LOG_LEVEL="${PDN_DXVK_LOG_LEVEL:-warn}"
+export MVK_CONFIG_LOG_LEVEL=1
+unset DYLD_LIBRARY_PATH
+mkdir -p "$BASE/cache" "$BASE/logs"
+cd "$BASE/app"
+exec "$WINE" "$BASE/app/paintdotnet.exe" "$@" > "$BASE/logs/launch.log" 2>&1
