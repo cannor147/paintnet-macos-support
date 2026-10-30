@@ -356,6 +356,10 @@ def bundle(work, output, llvm_prefix, external_llvm):
              '-O2', '-Wall', '-Wextra', '-Werror', '-I', mesa_source / 'include',
              HERE / 'vulkan_probe.c', '-o', stage / 'bin/vulkan-probe'])
         run(['codesign', '--force', '--sign', '-', stage / 'bin/vulkan-probe'])
+        run(['xcrun', 'clang', '-arch', 'x86_64', '-arch', 'arm64', '-mmacosx-version-min=' + MIN_MACOS,
+             '-O2', '-fobjc-arc', '-framework', 'Cocoa', HERE / 'app_launcher.m',
+             '-o', stage / 'bin/paintnet-launcher'])
+        run(['codesign', '--force', '--sign', '-', stage / 'bin/paintnet-launcher'])
         shutil.copytree(mesa_source / 'licenses', stage / 'licenses/mesa')
         shutil.copy2(mesa_source / 'docs/license.rst', stage / 'licenses/Mesa-license.rst')
         shutil.copy2(llvm_source / 'llvm/LICENSE.TXT', stage / 'licenses/LLVM.txt')
@@ -370,7 +374,7 @@ def bundle(work, output, llvm_prefix, external_llvm):
         llvm_record = json.loads(llvm_record_path.read_text()) if llvm_record_path.exists() else {
             'origin': 'external-development-prefix', 'version': run([llvm_prefix / 'bin/llvm-config', '--version'], capture=True),
             'compiler_and_sdk': 'unknown; minimum OS derived from bundled Mach-O load commands'}
-        binaries = list(lib.iterdir()) + [stage / 'bin/vulkan-probe']
+        binaries = list(lib.iterdir()) + [stage / 'bin/vulkan-probe', stage / 'bin/paintnet-launcher']
         minimum = max([MIN_MACOS] + [minimum_os(p) for p in binaries], key=version_tuple)
         record = {'schema_version': 1, 'architecture': 'x86_64', 'minimum_macos': minimum,
                   'llvm_origin': 'external-development-prefix' if external_llvm else 'pinned-source-build',

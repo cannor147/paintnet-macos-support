@@ -2,6 +2,12 @@
 set -euo pipefail
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
 IFS= read -r WINE < "$BASE/wine-path"
+WINE_ARGV0="$WINE"
+if [[ -n "${PDN_WINE_LOADER:-}" ]]; then
+    WINE_ARGV0="$(cd "$(dirname "$WINE")/.." && pwd)/lib/wine/x86_64-unix/wine"
+    WINE="$PDN_WINE_LOADER"
+    export WINELOADERNOEXEC=1
+fi
 export WINEPREFIX="$BASE/wineprefix"
 export WINEDLLOVERRIDES='dxgi,d3d11,d3d10core=n;mshtml=;d3dcompiler_47=n'
 export VK_DRIVER_FILES="$BASE/runtime/icd/lavapipe.json:$BASE/runtime/icd/moltenvk.json"
@@ -12,6 +18,14 @@ export WINEDEBUG="${PDN_WINEDEBUG:--all}"
 export DXVK_LOG_LEVEL="${PDN_DXVK_LOG_LEVEL:-warn}"
 export MVK_CONFIG_LOG_LEVEL=1
 unset DYLD_LIBRARY_PATH
+ARGS=()
+for ARG in "$@"; do
+    if [[ "$ARG" == /* && -e "$ARG" ]]; then
+        ARGS+=("Z:$(printf '%s' "$ARG" | tr '/' '\\')")
+    else
+        ARGS+=("$ARG")
+    fi
+done
 mkdir -p "$BASE/cache" "$BASE/logs"
 cd "$BASE/app"
-exec "$WINE" "$BASE/app/paintdotnet.exe" "$@" > "$BASE/logs/launch.log" 2>&1
+exec -a "$WINE_ARGV0" "$WINE" "$BASE/app/paintdotnet.exe" "${ARGS[@]+${ARGS[@]}}" > "$BASE/logs/launch.log" 2>&1

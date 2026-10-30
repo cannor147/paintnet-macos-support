@@ -11,8 +11,10 @@ otherwise opened an unresponsive window. GPU image processing remains available.
 - Build target: macOS 15+, x86_64 Wine; Apple Silicon requires Rosetta.
 - Tested on Apple M3 Pro / macOS 26.6.1 with Wine 11.20 and Paint.NET 5.2 build9793.
   Other Macs/macOS versions still require runtime testing.
-- Installation: Python3.9+, existing Wine11.20+ including its Vulkan loader,
+- Installation: existing Wine11.20+ including its Vulkan loader,
   and an official x64 Wine Paint.NET ZIP with its expected SHA256.
+- The app wrapper expects Wine's standard `lib/wine/x86_64-unix/wine` loader
+  layout (tested with the Gcenx Wine Devel .app).
 - Building: Python3.10+, Xcode Command Line Tools, pkg-config and Bison2.7+.
   LLVM builds need several GB of disk space. Wine/Paint.NET are downloaded separately.
 
@@ -42,14 +44,23 @@ non-identical binaries. The bundle records its actual minimum macOS version.
   --runtime "$PWD/dist/runtime" \
   --wine "/path/to/Wine Devel.app" \
   --dest "$HOME/Library/Application Support/Paint.NET-on-Wine-macOS" \
-  --launcher "$HOME/Applications/Paint.NET.command"
+  --app-bundle "$HOME/Applications/Paint.NET.app"
 ```
 
-The destination and optional launcher must not already exist. Installation checks
+The destination and app bundle must not already exist. Installation checks
 archive/runtime integrity and both Vulkan adapters, then creates a fresh prefix.
-Existing installations remain available for rollback. Run the generated launcher
-or `DEST/Paint.NET.command`; diagnostics are available at `DEST/bin/diagnose`.
-No sudo, global library edits or Gatekeeper changes are made.
+Existing installations remain available for rollback. Open `Paint.NET.app` from
+Applications and keep its icon in the Dock. Finder's Open With and dropping files
+on the app icon use the normal file-open path. The icon comes from the supplied
+Paint.NET package. A private tiny Wine loader copy gives the running editor the
+same app name/icon while sharing the original Wine libraries.
+The shell installer uses macOS commands and the prebuilt native app helper;
+Python and developer tools are not required to install or run the app.
+The helper brands only the private loader's embedded metadata and signs the
+result; it does not change the shared Wine installation. The wrapper uses the
+normal unsaved-work quit handling rather than killing the editor.
+`DEST/Paint.NET.command` remains available for command-line use; diagnostics are
+at `DEST/bin/diagnose`. No sudo, global library edits or Gatekeeper changes are made.
 
 `PDN_LLVMPIPE_THREADS` overrides the default4 workers per software device.
 `--enable-ui-acceleration` is an experimental installer opt-in.
@@ -59,7 +70,8 @@ save/reopen yourself; adapter enumeration alone does not establish usability.
 
 Drag-and-drop into the canvas can freeze interaction. Use File → Open / Ctrl+O;
 see [upstream issue59](https://github.com/paintdotnet/Paint.NET-on-Wine/issues/59).
-This package does not fix that upstream path. Experimental Paint.NET packages
+Dropping files on the app icon instead bypasses that canvas path.
+This package does not fix the upstream canvas path. Experimental Paint.NET packages
 expire, so obtain a current official Wine package when installing later.
 
 [Paint.NET-on-Wine](https://github.com/paintdotnet/Paint.NET-on-Wine) already

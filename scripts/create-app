@@ -1,0 +1,47 @@
+#!/bin/bash
+set -euo pipefail
+[[ $# == 2 ]] || { echo 'Usage: create-app INSTALLATION APP_BUNDLE' >&2; exit 2; }
+BASE="$(cd "$1" && pwd)"
+APP="$2"
+[[ "$APP" == /* && "$APP" == *.app ]] || { echo 'App bundle path must be absolute and end in .app' >&2; exit 1; }
+[[ ! -e "$APP" && ! -L "$APP" ]] || { echo "Already exists: $APP" >&2; exit 1; }
+mkdir -p "$(dirname "$APP")"
+STAGE="$(mktemp -d "$(dirname "$APP")/.paintnet-app.XXXXXX")"
+trap '[[ ! -d "$STAGE" ]] || rm -rf "$STAGE"' EXIT
+mkdir -p "$STAGE/Contents/MacOS" "$STAGE/Contents/Resources"
+cp "$BASE/runtime/bin/paintnet-launcher" "$STAGE/Contents/MacOS/Paint.NET"
+IFS= read -r WINE < "$BASE/wine-path"
+WINE_ROOT="$(cd "$(dirname "$WINE")/.." && pwd)"
+"$BASE/runtime/bin/paintnet-launcher" --brand-wine "$WINE_ROOT/lib/wine/x86_64-unix/wine" "$STAGE/Contents/MacOS/wine"
+printf '%s\n' "$BASE" > "$STAGE/Contents/Resources/installation.txt"
+/usr/bin/sips -s format icns "$BASE/app/paintdotnet.ico" --out "$STAGE/Contents/Resources/Paint.NET.icns" >/dev/null
+cat > "$STAGE/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>Paint.NET</string>
+<key>CFBundleIdentifier</key><string>org.paintdotnet.wine.macos.launcher</string>
+<key>CFBundleName</key><string>Paint.NET</string>
+<key>CFBundleDisplayName</key><string>Paint.NET</string>
+<key>CFBundleIconFile</key><string>Paint.NET.icns</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>LSMinimumSystemVersion</key><string>15.0</string>
+<key>LSMultipleInstancesProhibited</key><true/>
+<key>LSUIElement</key><true/>
+<key>NSHighResolutionCapable</key><true/>
+<key>CFBundleDocumentTypes</key><array><dict>
+<key>CFBundleTypeName</key><string>Paint.NET images</string>
+<key>CFBundleTypeRole</key><string>Editor</string>
+<key>LSHandlerRank</key><string>Alternate</string>
+<key>CFBundleTypeExtensions</key><array><string>pdn</string><string>png</string><string>jpg</string><string>jpeg</string><string>bmp</string><string>gif</string><string>tif</string><string>tiff</string><string>webp</string></array>
+</dict></array>
+</dict></plist>
+PLIST
+chmod +x "$STAGE/Contents/MacOS/Paint.NET"
+/usr/bin/plutil -lint "$STAGE/Contents/Info.plist"
+/usr/bin/codesign --force --sign - "$STAGE/Contents/MacOS/wine" >/dev/null
+/usr/bin/codesign --force --sign - "$STAGE" >/dev/null
+/usr/bin/codesign --verify --strict "$STAGE"
+"$BASE/runtime/bin/paintnet-launcher" --rename-exclusive "$STAGE" "$APP"
+echo "Created $APP"
